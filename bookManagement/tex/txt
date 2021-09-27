@@ -1,0 +1,37 @@
+- 1) Share the DB schema for the project.  - Done
+
+- 2) Create a package for the DB operations that will only be responsible to query DB. The handlers will call the functions from that
+package to perform DB operations. This is refactoring of code only.
+
+3) Need to handle panics properly to prevent server crash. Prefer to use errors and only use panic when really required(maybe to stop server,
+highly unlikely)
+
+- 4) Schema needs to be elaborate. Should have author, price, stock, etc. as relevant parameters - Done
+
+- 5) Keep id as internal field and not expose it. Perform search by other columns. This should be implemented in the GET method using query params.
+Example, as per the query params given in the URL:
+		 Fetch details of all books that have the same author
+		 Fetch book with ISBN
+		 Fetch all books within given price range
+
+- 6) Use a single GET endpoint to fetch books with the filters applied. This can respond with one or more books that match the filters provided.
+
+- 7) Modify update handler to allow updates to relevant columns of a book. This book can be identified by the ISBN number, that can be taken as request payload -Done
+
+8) Modify create handler with the new DB columns.
+
+- 9) Implement all the handler functions as methods of a type that wraps the DB instance on server start. Access the wrapped DB instance for calling DB functions to perform DB operations.
+
+- 10) Separate out the router to its own package and register endpoints in that package. Thus main() will ONLY be responsible to initialise the packages and start the server.
+
+- 11) Send MySQL or other configurations like, user, password, DB, port, IP, etc. as input while starting/running the program.
+	Best practice is to maintain a configuration file, that the program will read when started.
+
+ 12) As per the requirement, all requests & responses should be in JSON. Using Fprintf(), returns a string that does not meet this requirement. Need to modify.
+
+- 13) Handle all errors, even the ones from Unmarshal(). - Done
+
+14) Instead of using map[string]string to parse the request payload and extract the data, use predefined structs.
+	Refer to the web server assignment where request payload was being parsed.
+
+15) Create response structs with JSON struct field tags and send response from the handlers

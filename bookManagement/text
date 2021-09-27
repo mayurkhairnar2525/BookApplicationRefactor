@@ -1,0 +1,142 @@
+package main
+import (
+   "database/sql"
+   "encoding/json"
+   "fmt"
+   _ "github.com/go-sql-driver/mysql"
+   "github.com/gorilla/mux"
+   "log"
+   "net/http"
+)
+type BookManagement struct {
+   ID           int    `json:"id"`
+   Name         string `json:"name"`
+   Author       string `json:"author"`
+   Prices       string `json:"prices"`
+   Available    string `json:"available"`
+   PageQuality  string `json:"pagequality"`
+   LaunchedYear string `json:"launchedyear"`
+   Isbn         string `json:"isbn"`
+}
+var db *sql.DB
+var err error
+const (
+   DriverName = "mysql"
+   ROOT       = "root"
+   PASSWORD   = "12345678"
+   HOST       = "0.0.0.0"
+   PORT       = "9090"
+   DBNAME     = "bookstore"
+)
+func getBooks(w http.ResponseWriter, r *http.Request) {
+   w.Header().Set("Content-Type", "application/json")
+   var books []BookManagement
+   result, err := db.Query("SELECT id, name, author, prices,available,lauchedyear, isbn from bookmanagement")
+   if err != nil {
+      fmt.Fprintf(w, "error %s", err)
+      return
+   }
+   defer result.Close()
+   for result.Next() {
+      var book BookManagement
+      err := result.Scan(&book.ID, &book.Name, &book.Author, &book.Prices, &book.Available, &book.LaunchedYear, &book.Isbn)
+      if err != nil {
+         fmt.Fprintf(w, "error %s", err)
+         return
+      }
+      books = append(books, book)
+   }
+   json.NewEncoder(w).Encode(books)
+}
+func createBook(w http.ResponseWriter, r *http.Request) {
+   stmt, err := db.Prepare("INSERT INTO bookmanagement(id,name,author,prices,available,pagequality,lauchedyear,isbn) VALUES(?,?,?,?,?,?,?,?)")
+   if err != nil {
+      fmt.Fprintf(w, "error %s", err)
+      return
+   }
+   var emp BookManagement
+   err = json.NewDecoder(r.Body).Decode(&emp)
+   if err != nil {
+      fmt.Fprintf(w, "error %s", err)
+      return
+   }
+   log.Println("data:", emp)
+   _, err = stmt.Exec(emp.ID, emp.Name, emp.Author, emp.Prices, emp.Available, emp.PageQuality, emp.LaunchedYear, emp.Isbn)
+   if err != nil {
+      fmt.Fprintf(w, "error %s", err)
+      return
+   }
+   fmt.Fprintf(w, "New book was created")
+}
+func getBook(w http.ResponseWriter, r *http.Request) {
+   w.Header().Set("Content-Type", "application/json")
+   params := mux.Vars(r)
+   result, err := db.Query("SELECT id, name, author, prices, available, pagequality, lauchedyear, isbn FROM bookmanagement WHERE author = ?", params["author"])
+   if err != nil {
+      fmt.Fprintf(w, "error %s", err)
+      return
+   }
+   defer result.Close()
+   var book BookManagement
+   for result.Next() {
+      err := result.Scan(&book.ID, &book.Name, &book.Author, &book.Prices, &book.Available, &book.PageQuality, &book.LaunchedYear, &book.Isbn)
+      if err != nil {
+         fmt.Fprintf(w, "error %s", err)
+         return
+      }
+   }
+   json.NewEncoder(w).Encode(book)
+}
+func updateBook(w http.ResponseWriter, r *http.Request) {
+   stmt, err := db.Prepare("UPDATE bookmanagement SET name =?, author=?,prices=?,available=?,pagequality=?,lauchedyear=? WHERE isbn = ?")
+   if err != nil {
+      fmt.Fprintf(w, "error %s", err)
+      return
+   }
+   var emp BookManagement
+   err = json.NewDecoder(r.Body).Decode(&emp)
+   if err != nil {
+      fmt.Fprintf(w, "error %s", err)
+      return
+   }
+   params := mux.Vars(r)
+   result, err := stmt.Exec(emp.Name, emp.Author, emp.Prices, emp.Available, emp.PageQuality, emp.LaunchedYear, emp.Isbn)
+   if err != nil {
+      fmt.Fprintf(w, "error %s", err)
+      return
+   }
+   result.RowsAffected()
+   fmt.Fprintf(w, "Book with ISBN = %s was updated", params["isbn"])
+}
+func deleteBook(w http.ResponseWriter, r *http.Request) {
+   params := mux.Vars(r)
+   stmt, err := db.Prepare("DELETE FROM bookmanagement WHERE id = ?")
+   if err != nil {
+      fmt.Fprintf(w, "error %s", err)
+      return
+   }
+   _, err = stmt.Exec(params["id"])
+   if err != nil {
+      fmt.Fprintf(w, "error %s", err)
+      return
+   }
+   fmt.Fprintf(w, "Book with ID = %s was deleted", params["id"])
+}
+func handler(w http.ResponseWriter, r *http.Request) {
+   w.Write([]byte("Hello Everyone!"))
+}
+func main() {
+   db, err = sql.Open(DriverName, ROOT+":"+PASSWORD+"@tcp("+HOST+":"+PORT+")/"+DBNAME)
+   if err != nil {
+      fmt.Println("error occurred", err)
+   }
+   defer db.Close()
+   router := mux.NewRouter()
+   router.HandleFunc("/books", getBooks).Methods("GET")
+   router.HandleFunc("/books", createBook).Methods("POST")
+   router.HandleFunc("/books/{author}", getBook).Methods("GET")
+   router.HandleFunc("/books/{isbn}", updateBook).Methods("PUT")
+   router.HandleFunc("/books/{id}", deleteBook).Methods("DELETE")
+   router.HandleFunc("/", handler)
+   http.ListenAndServe(":8090", router)
+}
